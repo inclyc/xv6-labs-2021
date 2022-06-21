@@ -1,7 +1,10 @@
-#include "sysinfo.h"
 #include "types.h"
-#include "defs.h"
+#include "param.h"
+#include "riscv.h"
+#include "spinlock.h"
 #include "proc.h"
+#include "sysinfo.h"
+#include "defs.h"
 
 uint64 sys_sysinfo(void)
 {
@@ -11,6 +14,10 @@ uint64 sys_sysinfo(void)
   }
   struct sysinfo info;
   struct proc *p = myproc();
-  // TODO: fill info.freemem and info.nproc here
-  copyout(p->pagetable, va_info, &info, sizeof(info));
+  info.freemem = kfreepages_count() * PGSIZE;
+  info.nproc = nproc();
+  if(copyout(p->pagetable, va_info, (void*)&info, sizeof(info))){
+    return -1;
+  }
+  return 0;
 }
