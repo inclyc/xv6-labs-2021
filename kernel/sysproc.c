@@ -52,10 +52,7 @@ sys_sbrk(void)
   return addr;
 }
 
-uint64
-sys_sleep(void)
-{
-  backtrace();
+uint64 sys_sleep(void) {
   int n;
   uint ticks0;
 
