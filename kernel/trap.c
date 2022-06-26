@@ -70,6 +70,12 @@ usertrap(void)
       // timer interrrupt
       if (p->alarm_period) {
         if (p->alarm_ticks == 0) {
+          // the user process may be interrupted by hardware timers
+          // we copy process trapframe here
+          // then we could resume user process after
+          // alarm_handler calls sigreturn()
+          p->alarm_trapframe = *(p->trapframe);
+
           // we should invoke alarm_handler here.
           p->trapframe->epc = (uint64)p->alarm_handler;
 

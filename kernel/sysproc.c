@@ -106,5 +106,3 @@ uint64 sys_sigalarm() {
   sigalarm(ticks, handler);
   return 0;
 }
-
-uint64 sys_sigreturn() { return 0; }
