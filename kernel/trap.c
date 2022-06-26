@@ -68,10 +68,14 @@ usertrap(void)
   } else if((which_dev = devintr()) != 0){
     if (which_dev == 2) {
       // timer interrrupt
-      if (p->enable_alarm) {
+      if (p->alarm_period) {
         if (p->alarm_ticks == 0) {
           // we should invoke alarm_handler here.
           p->trapframe->epc = (uint64)p->alarm_handler;
+
+          // reset alarm_ticks to origin period
+          // set by proc.c sigalarm()  (syscall)
+          p->alarm_ticks = p->alarm_period;
         } else {
           // counting down alarm
           p->alarm_ticks--;

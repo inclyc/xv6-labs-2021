@@ -108,5 +108,5 @@ struct proc {
 
   int alarm_ticks;
   void (*alarm_handler)();
-  int enable_alarm;
+  int alarm_period;
 };

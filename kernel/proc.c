@@ -143,7 +143,7 @@ found:
 
   p->alarm_handler = 0;
   p->alarm_ticks = 0;
-  p->enable_alarm = 0;
+  p->alarm_period = 0;
 
   return p;
 }
@@ -661,11 +661,6 @@ procdump(void)
 
 void sigalarm(int alarm_ticks, void (*handler)()) {
   struct proc *p = myproc();
-  if (alarm_ticks | (uint64)handler) {
-    p->alarm_ticks = alarm_ticks;
-    p->alarm_handler = handler;
-    p->enable_alarm = 1;
-  } else {
-    p->enable_alarm = 0;
-  }
+  p->alarm_period = p->alarm_ticks = alarm_ticks;
+  p->alarm_handler = handler;
 }
