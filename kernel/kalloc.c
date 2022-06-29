@@ -23,11 +23,26 @@ struct {
   struct run *freelist;
 } kmem;
 
+int rc_page[PHYSTOP / PGSIZE]; // 8 * 4096 * 4 in this case;
+
+#define PG_NUM(pa) ((uint64)(pa) / PGSIZE)
+int deref_page(void * pa) {
+  int *ref = rc_page + PG_NUM(pa);
+  *ref -= 1;
+  return *ref;
+}
+int ref_page(void * pa) {
+  int *ref = rc_page + PG_NUM(pa);
+  *ref += 1;
+  return *ref;
+}
+
 void
 kinit()
 {
   initlock(&kmem.lock, "kmem");
   freerange(end, (void*)PHYSTOP);
+  memset(rc_page, 0, sizeof(rc_page));
 }
 
 void
@@ -35,8 +50,11 @@ freerange(void *pa_start, void *pa_end)
 {
   char *p;
   p = (char*)PGROUNDUP((uint64)pa_start);
-  for(; p + PGSIZE <= (char*)pa_end; p += PGSIZE)
+  for(; p + PGSIZE <= (char*)pa_end; p += PGSIZE) {
+    ref_page(p);
     kfree(p);
+  }
+    
 }
 
 // Free the page of physical memory pointed at by v,
@@ -46,6 +64,13 @@ freerange(void *pa_start, void *pa_end)
 void
 kfree(void *pa)
 {
+  int ref = deref_page(pa);
+  if(ref < 0) {
+    panic("kalloc: ref");
+  }
+  if(ref != 0) {
+    return;
+  }
   struct run *r;
 
   if(((uint64)pa % PGSIZE) != 0 || (char*)pa < end || (uint64)pa >= PHYSTOP)
@@ -78,5 +103,6 @@ kalloc(void)
 
   if(r)
     memset((char*)r, 5, PGSIZE); // fill with junk
+  ref_page(r);
   return (void*)r;
 }
