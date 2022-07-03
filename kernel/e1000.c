@@ -95,27 +95,63 @@ e1000_init(uint32 *xregs)
 int
 e1000_transmit(struct mbuf *m)
 {
-  //
-  // Your code here.
-  //
-  // the mbuf contains an ethernet frame; program it into
-  // the TX descriptor ring so that the e1000 sends it. Stash
-  // a pointer so that it can be freed after sending.
-  //
+  acquire(&e1000_lock);
+  int tx_ring_idx = regs[E1000_TDT];
+  struct tx_desc* last_desc = &tx_ring[tx_ring_idx];
   
+  // check if the ring is overflowing
+  if (!(last_desc->status | E1000_TXD_STAT_DD)) { 
+    // E10000 hasn't finished sending previous packet yet [E1000 3.3.3.2]
+    // return an error here.
+    release(&e1000_lock);
+    return -1;
+  }
+  
+  // Free the last mbuf that was transmitted from that descriptor (if there was one). 
+  if(tx_mbufs[tx_ring_idx]){
+    mbuffree(tx_mbufs[tx_ring_idx]);  
+  }
+  tx_mbufs[tx_ring_idx] = m;
+  
+  last_desc->addr = (uint64)m->head;
+  last_desc->length = m->len;
+  last_desc->cmd = E1000_TXD_CMD_EOP | E1000_TXD_CMD_RS;
+  
+  regs[E1000_TDT] = (regs[E1000_TDT] + 1) % TX_RING_SIZE;
+  release(&e1000_lock);
   return 0;
 }
 
 static void
 e1000_recv(void)
 {
-  //
-  // Your code here.
-  //
-  // Check for packets that have arrived from the e1000
-  // Create and deliver an mbuf for each packet (using net_rx()).
-  //
+  for(;;) {
+    // fetching the E1000_RDT control register.
+    uint32 idx = regs[E1000_RDT];
+    // adding one modulo RX_RING_SIZE.
+    idx = (idx + 1) % RX_RING_SIZE;
+    // check if a new packet is available by checking for the E1000_RXD_STAT_DD bit 
+    // in the status portion of the descriptor. If not, stop.
+    if (!(rx_ring[idx].status & E1000_RXD_STAT_DD)) {
+      return;
+    }
+    // update the mbuf's m->len to the length reported in the descriptor. 
+    rx_mbufs[idx]->len = rx_ring[idx].length;
+    // deliver the mbuf to the network stack using net_rx().
+    net_rx(rx_mbufs[idx]);
+    // allocate a new mbuf using mbufalloc() to replace the one just given to net_rx().
+    struct mbuf *m = mbufalloc(0);
+    rx_mbufs[idx] = m;
+    // program its data pointer (m->head) into the descriptor. 
+    rx_ring[idx].addr = (uint64)m->head;
+    // clear the descriptor's status bits to zero.
+    rx_ring[idx].status = 0;
+    // update the E1000_RDT register to be the index of the last ring descriptor processed
+    regs[E1000_RDT] = idx;
+  }
 }
+  
+
 
 void
 e1000_intr(void)
